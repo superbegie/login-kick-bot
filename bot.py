@@ -1,3 +1,4 @@
+
 """
 Session Kicker — Telegram Bot
 Railway deploy: set BOT_TOKEN env var. Everything else is inline.
@@ -12,7 +13,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any, Tuple
 from collections import defaultdict
 
-import zstandard as zstd
+from pyzstd import compress as zstd_compress
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -242,7 +243,7 @@ def send_session_kick(profile: Dict[str, Any], timeout: float = 4.5) -> Tuple[bo
         }).data
 
         pkt   = SdpStruct({0: 10001, 1: 1, 5: body}).data
-        comp  = zstd.compress(pkt)
+        comp  = zstd_compress(pkt)
         flags = (len(comp) + 4) | (16 << 24)
         sock.send(flags.to_bytes(4, 'big') + comp)
 
@@ -566,5 +567,4 @@ def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
     conv = ConversationHandler(
-        entry_points=[CommandHandler("kick", cmd_kick)],
-        
+        entry_points=[CommandHandler("kick", 
