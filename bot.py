@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any, Tuple
 from collections import defaultdict
 
-import zstd
+import zstandard as zstd
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -567,5 +567,4 @@ def main():
 
     conv = ConversationHandler(
         entry_points=[CommandHandler("kick", cmd_kick)],
-        states={
-    
+        
